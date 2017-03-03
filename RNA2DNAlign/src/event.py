@@ -103,8 +103,20 @@ class DNAOnlyEvent(Event):
 class NoGDNAEvent(Event):
     requires = set(["SDNA","NRNA","TRNA"])
 
+class NoNRNAEvent(Event):
+    """ Events where Normal RNA is not required """
+    requires = set(["GDNA","SDNA","TRNA"])
+
 class SomaticVariantEvent(Event):
     abbrev = "SOM"
+    cosmic = True
+
+class SomaticVSEEvent(Event):
+    abbrev = "SOM-E"
+    cosmic = True
+    
+class SomaticVSLEvent(Event):
+    abbrev = "SOM-L"
     cosmic = True
 
 class RNAEditingEvent(Event):
@@ -132,7 +144,19 @@ class TumorVSLEvent(Event):
 
 class Somatic_DNAOnly(DNAOnlyEvent,SomaticVariantEvent):
     pass
-        
+
+class Somatic_VSE_AllSamples(AllSamplesEvent,SomaticVSEEvent):
+    pass
+
+class Somatic_VSE_NoNRNA(NoNRNAEvent,SomaticVSEEvent):
+    pass
+
+class Somatic_VSL_AllSamples(AllSamplesEvent,SomaticVSLEvent):
+    pass
+
+class Somatic_VSL_NoNRNA(NoNRNAEvent,SomaticVSLEvent):
+    pass
+
 class TSS_AllSamples(AllSamplesEvent,SomaticVariantEvent):
     pass
         
