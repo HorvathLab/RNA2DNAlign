@@ -73,7 +73,7 @@ class ChromLabels(object):
 
 class ChromLabelRegistry(object):
     def __init__(self):
-	self._reg = {}
+        self._reg = {}
         self._bam = []
 
     def add_labels(self,filename,labels):
@@ -81,8 +81,12 @@ class ChromLabelRegistry(object):
 
     def add_bamlabels(self,filename):
         samfile = pysam.Samfile(filename, "rb")
-	assert samfile._hasIndex(), "Cannot open BAM index for file %s"%filename
-	self._reg[filename] = ChromLabels(samfile.references)
+        if pysam.__version__ == '0.8.4':
+            assert samfile.has_index(), "Cannot open BAM index for file %s" % filename
+        else:
+            assert samfile._hasIndex(), "Cannot open BAM index for file %s" % filename
+
+        self._reg[filename] = ChromLabels(samfile.references)
         self._bam.append(filename)
 
     def add_label(self,filename,label):
@@ -108,8 +112,8 @@ class ChromLabelRegistry(object):
         return self._reg[filename].labels
 
     def chroms(self, filename):
-	for lab in self.labels(filename):
-	    yield self.label2chrom(filename,lab)
+        for lab in self.labels(filename):
+            yield self.label2chrom(filename,lab)
 
     def label2label(self, filename1, filename2, label1):
         chr1 = self.label2chrom(filename1,label1)
@@ -151,7 +155,7 @@ class ChromLabelRegistry(object):
         if self.consistent_bamfile_order():
             self.bamfile_chrom_order()
         else:
-	    # print >>sys.stderr, "Warning: inconsistent chromosome name order"
+            # print >>sys.stderr, "Warning: inconsistent chromosome name order"
             self.default_chrom_order()
 
     def consistent_bamfile_order(self):
@@ -170,26 +174,26 @@ class ChromLabelRegistry(object):
         return True
 
     def bamfile_chrom_order(self):
-	allchrom = set()
-	inedges = defaultdict(set)
-	outedges = defaultdict(set)
-	s = set()
-	for bf in self._bam:
-	    bfchrs = list(self.chroms(bf))
-	    allchrom.update(bfchrs)
-	    for i in range(1,len(bfchrs)):
-		inedges[bfchrs[i]].add(bfchrs[i-1])
-		outedges[bfchrs[i-1]].add(bfchrs[i])
-	s = set()
-	for chr in allchrom:
-	    if len(inedges[chr]) == 0:
-	        s.add(chr)
-	if len(s) == 0:
-	    s.add(min(allchrom))
-	nextordinal = 1
-	labeled = set()
-	self._chrom_order = {}
-	while len(s) > 0:
+        allchrom = set()
+        inedges = defaultdict(set)
+        outedges = defaultdict(set)
+        s = set()
+        for bf in self._bam:
+            bfchrs = list(self.chroms(bf))
+            allchrom.update(bfchrs)
+            for i in range(1,len(bfchrs)):
+                inedges[bfchrs[i]].add(bfchrs[i-1])
+                outedges[bfchrs[i-1]].add(bfchrs[i])
+        s = set()
+        for chr in allchrom:
+            if len(inedges[chr]) == 0:
+                s.add(chr)
+        if len(s) == 0:
+            s.add(min(allchrom))
+        nextordinal = 1
+        labeled = set()
+        self._chrom_order = {}
+        while len(s) > 0:
             u = s.pop()
             self._chrom_order[u] = nextordinal
             labeled.add(u)

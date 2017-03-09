@@ -12,7 +12,7 @@ class Pileups(object):
         self.loci = loci
         self.samfiles = samfiles
         self.filter = filter
-	self.chrreg = chrreg
+        self.chrreg = chrreg
 
 class SerialPileups(Pileups):
 
@@ -21,7 +21,10 @@ class SerialPileups(Pileups):
         chrommap = []
         for al in self.samfiles:
             samfile = pysam.Samfile(al, "rb")
-	    assert samfile._hasIndex(), "Cannot open BAM index for file %s"%sf
+            if pysam.__version__ == '0.8.4':
+                assert samfile.has_index(), "Cannot open BAM index for file %s" % filename
+            else:
+                assert samfile._hasIndex(), "Cannot open BAM index for file %s" % filename
             samfiles.append(samfile)
             chrommap.append(self.chrreg.chrommap(al))
             
@@ -31,9 +34,9 @@ class SerialPileups(Pileups):
             reads = []
             snvpos1 = snvpos - 1
             for i, samfile in enumerate(samfiles):
-		try:
-		    snvlabel = chrommap[i](snvchr)
-		    if snvlabel != None:
+                try:
+                    snvlabel = chrommap[i](snvchr)
+                    if snvlabel != None:
                       for pileupcolumn in samfile.pileup(snvlabel, snvpos1, snvpos1 + 1, truncate=True):
                         total[i] += pileupcolumn.n
                         for pileupread in pileupcolumn.pileups:
@@ -44,10 +47,10 @@ class SerialPileups(Pileups):
                                 continue
                             reads.append((al, pos, base, i))
                             cnts[(i, 'Good')] += 1
-		except ValueError:
-		    pass
-	    total[i] -= cnts[(i,"GapInQueryAtSNVLocus")]
-	    # del cnts[(i,"GapInQueryAtSNVLocus")]
+                except ValueError:
+                    pass
+            total[i] -= cnts[(i,"GapInQueryAtSNVLocus")]
+            # del cnts[(i,"GapInQueryAtSNVLocus")]
             yield (snvchr, snvpos, ref, alt, total, reads, cnts)
 
 class ThreadedPileups(Pileups):
@@ -62,26 +65,29 @@ class ThreadedPileups(Pileups):
             for i in range(self.nb):
                 self._queue.append(Queue.Queue(20))
                 t = threading.Thread(target=self.worker,args=(i,j,k))
-		t.daemon = True
+                t.daemon = True
                 t.start()
                 k += 1
-	    time.sleep(1)
+            time.sleep(1)
 
     def worker(self,i,j,k):
         samfile = pysam.Samfile(self.samfiles[i], "rb")
-	assert samfile._hasIndex(), "Cannot open BAM index for file %s"%sf
-	chrommap = self.chrreg.chrommap(self.samfiles[i])
-	# blocksize = int(math.ceil(len(self.loci)/self.tpb))
-	# for l in range(j*blocksize,min((j+1)*blocksize,len(self.loci))):
-	for l in range(j,len(self.loci),self.tpb):
-	    snvchr, snvpos, ref, alt, snvextra = self.loci[l]
+        if pysam.__version__ == '0.8.4':
+            assert samfile.has_index(), "Cannot open BAM index for file %s" % filename
+        else:
+            assert samfile._hasIndex(), "Cannot open BAM index for file %s" % filename
+        chrommap = self.chrreg.chrommap(self.samfiles[i])
+        # blocksize = int(math.ceil(len(self.loci)/self.tpb))
+        # for l in range(j*blocksize,min((j+1)*blocksize,len(self.loci))):
+        for l in range(j,len(self.loci),self.tpb):
+            snvchr, snvpos, ref, alt, snvextra = self.loci[l]
             cnts = Counter()
             total = Counter()
             reads = []
             snvpos1 = snvpos - 1
-	    try:
-		snvlabel = chrommap(snvchr)
-		if snvlabel != None:
+            try:
+                snvlabel = chrommap(snvchr)
+                if snvlabel != None:
                   for pileupcolumn in samfile.pileup(snvlabel, snvpos1, snvpos1 + 1, truncate=True):
                     total[i] += pileupcolumn.n
                     for pileupread in pileupcolumn.pileups:
@@ -92,17 +98,17 @@ class ThreadedPileups(Pileups):
                             continue
                         reads.append((al, pos, base, i))
                         cnts[(i, 'Good')] += 1
-	    except ValueError, e:
-	        pass # raise e
-	    total[i] -= cnts[(i,"GapInQueryAtSNVLocus")]
-	    # del cnts[(i,"GapInQueryAtSNVLocus")]
-	    # print >>sys.stderr, (snvchr, snvpos, ref, alt, total, cnts)
+            except ValueError, e:
+                pass # raise e
+            total[i] -= cnts[(i,"GapInQueryAtSNVLocus")]
+            # del cnts[(i,"GapInQueryAtSNVLocus")]
+            # print >>sys.stderr, (snvchr, snvpos, ref, alt, total, cnts)
             self._queue[k].put((snvchr, snvpos, ref, alt, total, reads, cnts))
         return
         
     def iterator(self):
         k = 0
-	# for i in range(len(self.loci)):
+        # for i in range(len(self.loci)):
         for snvchr, snvpos, ref, alt, snvextra in self.loci:
             cnts = Counter()
             total = Counter()
@@ -134,26 +140,29 @@ class MultiprocPileups(Pileups):
             for i in range(self.nb):
                 self._queue.append(multiprocessing.Queue(20))
                 t = multiprocessing.Process(target=self.worker,args=(i,j,k))
-		t.daemon = True
+                t.daemon = True
                 t.start()
                 k += 1
-	    time.sleep(1)
+            time.sleep(1)
 
     def worker(self,i,j,k):
         samfile = pysam.Samfile(self.samfiles[i], "rb")
-	assert samfile._hasIndex(), "Cannot open BAM index for file %s"%sf
-	chrommap = self.chrreg.chrommap(self.samfiles[i])
-	# blocksize = int(math.ceil(len(self.loci)/self.tpb))
-	# for l in range(j*blocksize,min((j+1)*blocksize,len(self.loci))):
-	for l in range(j,len(self.loci),self.tpb):
-	    snvchr, snvpos, ref, alt, snvextra = self.loci[l]
+        if pysam.__version__ == '0.8.4':
+            assert samfile.has_index(), "Cannot open BAM index for file %s" % filename
+        else:
+            assert samfile._hasIndex(), "Cannot open BAM index for file %s" % filename
+        chrommap = self.chrreg.chrommap(self.samfiles[i])
+        # blocksize = int(math.ceil(len(self.loci)/self.tpb))
+        # for l in range(j*blocksize,min((j+1)*blocksize,len(self.loci))):
+        for l in range(j,len(self.loci),self.tpb):
+            snvchr, snvpos, ref, alt, snvextra = self.loci[l]
             cnts = Counter()
             total = Counter()
             reads = []
             snvpos1 = snvpos - 1
-	    try:
-		snvlabel = chrommap(snvchr)
-		if snvlabel != None:
+            try:
+                snvlabel = chrommap(snvchr)
+                if snvlabel != None:
                   for pileupcolumn in samfile.pileup(snvlabel, snvpos1, snvpos1 + 1, truncate=True):
                     total[i] += pileupcolumn.n
                     for pileupread in pileupcolumn.pileups:
@@ -164,17 +173,17 @@ class MultiprocPileups(Pileups):
                             continue
                         reads.append((PileupAlignment(al.seq,al.is_reverse), pos, base, i))
                         cnts[(i, 'Good')] += 1
-	    except ValueError, e:
-	        pass # raise e
-	    total[i] -= cnts[(i,"GapInQueryAtSNVLocus")]
-	    # del cnts[(i,"GapInQueryAtSNVLocus")]
-	    # print >>sys.stderr, (snvchr, snvpos, ref, alt, total, cnts)
+            except ValueError, e:
+                pass # raise e
+            total[i] -= cnts[(i,"GapInQueryAtSNVLocus")]
+            # del cnts[(i,"GapInQueryAtSNVLocus")]
+            # print >>sys.stderr, (snvchr, snvpos, ref, alt, total, cnts)
             self._queue[k].put((snvchr, snvpos, ref, alt, total, reads, cnts))
         return
         
     def iterator(self):
         k = 0
-	# for i in range(len(self.loci)):
+        # for i in range(len(self.loci)):
         for snvchr, snvpos, ref, alt, snvextra in self.loci:
             cnts = Counter()
             total = Counter()
