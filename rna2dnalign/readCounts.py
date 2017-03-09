@@ -21,11 +21,13 @@ try:
                          '..', '..', 'common', 'src'))
 except NameError:
     pass
-from optparse_gui import OptionParser, OptionGroup, GUI, UserCancelledError, ProgressText
-from util import *
-from fisher import *
-from pileups import SerialPileups, ThreadedPileups, MultiprocPileups
-from chromreg import ChromLabelRegistry
+from mgpcutils import optparse_gui # OptionParser, OptionGroup, GUI, UserCancelledError, ProgressText
+from mgpcutils.util import *
+from mgpcutils.fisher import *
+from mgpcutils.pileups import SerialPileups, ThreadedPileups, MultiprocPileups
+from mgpcutils.chromreg import ChromLabelRegistry
+from mgpcutils.dataset import XLSFileTable, CSVFileTable, TSVFileTable, XLSXFileTable, TXTFileTable, BEDFile, VCFFile
+
 from operator import itemgetter
 
 from version import VERSION
@@ -45,20 +47,19 @@ def cleanup():
         shutil.rmtree(d, ignore_errors=True)
 atexit.register(cleanup)
 
-if not GUI() and len(sys.argv) == 2 and sys.argv[1] == '--GUI':
+if not optparse_gui.GUI() and len(sys.argv) == 2 and sys.argv[1] == '--GUI':
     from optparse_gui.needswx import *
     sys.exit(1)
 
-if GUI() and len(sys.argv) == 1:
-    from optparse_gui import OptionParserGUI
-    parser = OptionParserGUI(version=VERSION)
+if optparse_gui.GUI() and len(sys.argv) == 1:
+    parser = optparse_gui.OptionParserGUI(version=VERSION)
     error_kwargs = {'exit': False}
     sys.excepthook = excepthook
 else:
-    parser = OptionParser(version=VERSION)
+    parser = optparse_gui.OptionParser(version=VERSION)
     error_kwargs = {}
 
-advanced = OptionGroup(parser, "Advanced")
+advanced = optparse_gui.OptionGroup(parser, "Advanced")
 parser.add_option("-s", "--snvs", type="files", dest="snvs", default=None,
                   help="Single-Nucleotide-Variant files. Required.", name="SNV Files",
                   notNone=True, remember=True,
@@ -95,7 +96,7 @@ while True:
     if 'exit' in error_kwargs:
         try:
             opt, args = parser.parse_args(opts=opt)
-        except UserCancelledError:
+        except optparse_gui.UserCancelledError:
             sys.exit(0)
     else:
         opt, args = parser.parse_args()
@@ -107,9 +108,9 @@ if not opt.output:
     opt.quiet = True
 if opt.maxreads == None:
     opt.maxreads = 1e+20
-progress = ProgressText(quiet=opt.quiet)
+progress = optparse_gui.ProgressText(quiet=opt.quiet)
 
-from dataset import XLSFileTable, CSVFileTable, TSVFileTable, XLSXFileTable, TXTFileTable, BEDFile, VCFFile
+
 
 progress.stage("Read SNV data", len(opt.snvs))
 snvheaders = filter(None, """
@@ -152,7 +153,7 @@ for filename in opt.snvs:
 
     for r in snvs:
         chr = r[snvheaders[0]].strip()
-	snvchroms[filename].add(chr)
+        snvchroms[filename].add(chr)
         locus = int(r[snvheaders[1]].strip())
         ref = r[snvheaders[2]].strip()
         alt = r[snvheaders[3]].strip()
@@ -294,8 +295,8 @@ start = time.time()
 for snvchr, snvpos, ref, alt, snvextra in snvdata:
     
 ##     if opt.debug:
-## 	if totalsnvs % 100 == 0 and totalsnvs > 0:
-## 	    print "SNVs/sec: %.2f"%(float(totalsnvs)/(time.time()-start),)
+##         if totalsnvs % 100 == 0 and totalsnvs > 0:
+##             print "SNVs/sec: %.2f"%(float(totalsnvs)/(time.time()-start),)
 
     snvchr1, snvpos1, ref1, alt1, total, reads, badread = pileups.next()
     assert(snvchr == snvchr1 and snvpos == snvpos1)
@@ -362,11 +363,11 @@ for snvchr, snvpos, ref, alt, snvextra in snvdata:
                counted,
                100.0 * (total[si] - badread[si, 'Good']) /
                float(total[si]) if total[si] != 0 else 0.0,
-	       float(nsnv)/(nsnv+nref),
+               float(nsnv)/(nsnv+nref),
                -1, -1, -1, -1, -1,
                notherf, notherr,
                nother,
-	       -1, -1, -1, -1, -1,
+               -1, -1, -1, -1, -1,
                -1, -1, -1, -1, -1,
                duplicates_removed[si],
                badread[si, 'Good'],
@@ -386,11 +387,11 @@ coverage = defaultdict(list)
 maxreads = defaultdict(lambda: int(opt.maxreads))
 if 0 < opt.maxreads < 1:
     for r in map(lambda r: dict(zip(outheaders,r)),outrows):
-	coverage[r['AlignedReads']].append(r['GoodReads'])
+        coverage[r['AlignedReads']].append(r['GoodReads'])
     for al in coverage:
-	n = len(coverage[al])
-	percind = int(round(n*opt.maxreads))
-	maxreads[al] = sorted(coverage[al])[percind]
+        n = len(coverage[al])
+        percind = int(round(n*opt.maxreads))
+        maxreads[al] = sorted(coverage[al])[percind]
 
 for i in range(len(outrows)):
 
@@ -398,10 +399,10 @@ for i in range(len(outrows)):
     r = dict(zip(outheaders, outrows[i]))
     al,nsnv,nref,nother,counted = map(r.get,["AlignedReads","SNVCount","RefCount","OtherCount","GoodReads"])
     if counted > maxreads[al]:
-	factor = float(maxreads[al])/float(counted)
-	nsnv = int(round(factor*nsnv))
-	nref = int(round(factor*nref))
-	nother = int(round(factor*nother))
+        factor = float(maxreads[al])/float(counted)
+        nsnv = int(round(factor*nsnv))
+        nref = int(round(factor*nref))
+        nother = int(round(factor*nother))
 
     #Compute p-values
     pcount = 0.5
