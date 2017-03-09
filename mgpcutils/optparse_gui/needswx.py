@@ -1,7 +1,7 @@
 
 import sys, os, os.path, fnmatch, types, threading, time
 import re, copy, StringIO, csv, math, pickle
-from optparse_gui import OptionParser, UserCancelledError, Progress
+from mgpcutils.optparse_gui import OptionParser, UserCancelledError, Progress
 import optparse
 from ConfigParser import ConfigParser
 
