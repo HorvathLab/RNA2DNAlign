@@ -7,7 +7,6 @@ import sys
 import os
 import tempfile
 import shutil
-import traceback
 
 # third party imports
 
@@ -40,18 +39,12 @@ class OptValues:
     def __str__(self):
         return str(self.__dict__)
 
-def excepthook(etype, value, tb):
-    traceback.print_exception(etype, value, tb)
-    print >>sys.stderr, "Type <Enter> to Exit...",
-    sys.stderr.flush()
-    raw_input()
-
 if __name__=='__main__':
     if len(sys.argv) == 1 and HAS_WX:
         # Using the GUI
         parser = optparse_gui.OptionParserGUI(version=VERSION)
         error_kwargs = {'exit': False}
-        sys.excepthook = excepthook
+        sys.excepthook = optparse_gui.excepthook
         gui = True
     else:
         # Using command line
