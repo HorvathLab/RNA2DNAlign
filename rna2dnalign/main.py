@@ -6,7 +6,8 @@
 import sys
 import os
 import tempfile
-from collections import namedtuple
+import shutil
+import traceback
 
 # third party imports
 
@@ -15,30 +16,42 @@ from version import VERSION
 from mgpcutils import optparse_gui
 from mgpcutils import exonicFilter
 import readCounts
+import snv_computation
+import summary_analysis
 
 __author__ = 'Matthew L. Bendall'
 
 ''' Check whether wx is available '''
 try:
     import wx
-    print >>sys.stderr, "WX was imported"
+    # print >>sys.stderr, "WX was imported"
     HAS_WX = True
 except ImportError:
-    print >> sys.stderr, "WX was not imported"
+    # print >> sys.stderr, "WX was not imported"
     HAS_WX = False
 
 class OptValues:
+    """ Object with kwargs as attributes
+
+        Behaves like optparse.Values
+    """
     def __init__(self, **kwargs):
         self.__dict__ = kwargs
     def __str__(self):
         return str(self.__dict__)
+
+def excepthook(etype, value, tb):
+    traceback.print_exception(etype, value, tb)
+    print >>sys.stderr, "Type <Enter> to Exit...",
+    sys.stderr.flush()
+    raw_input()
 
 if __name__=='__main__':
     if len(sys.argv) == 1 and HAS_WX:
         # Using the GUI
         parser = optparse_gui.OptionParserGUI(version=VERSION)
         error_kwargs = {'exit': False}
-        # sys.excepthook = excepthook
+        sys.excepthook = excepthook
         gui = True
     else:
         # Using command line
@@ -73,26 +86,6 @@ if __name__=='__main__':
                          filetypes=[("Exonic Coordinates", "*.txt")])
     parser.add_option_group(exfilt_og)
 
-    ''' Regex group '''
-    regexs_og = optparse_gui.OptionGroup(parser, "Filename Matching")
-    regexs_og.add_option("--normaldnare", type="str", dest="normaldnare",
-                         default='GDNA',
-                         help="Germline/Normal DNA filename regular expression. Default: GDNA.",
-                         remember=True, name="Germline DNA")
-    regexs_og.add_option("--normaltransre", type="str", dest="normaltransre",
-                         default='NRNA',
-                         help="Normal transcriptome filename regular expression. Default: NRNA.",
-                         remember=True, name="Normal Transcr.")
-    regexs_og.add_option("--tumordnare", type="str", dest="tumordnare",
-                         default='SDNA',
-                         help="Somatic/Tumor DNA filename regular expression. Default: SDNA.",
-                         remember=True, name="Somatic DNA")
-    regexs_og.add_option("--tumortransre", type="str", dest="tumortransre",
-                         default='TRNA',
-                         help="Tumor transcriptome filename regular expression. Default: TRNA.",
-                         remember=True, name="Tumor Transcr.")
-    parser.add_option_group(regexs_og)
-
     ''' Readcounts group '''
     readcounts_og = optparse_gui.OptionGroup(parser, "Read Counting")
     readcounts_og.add_option("-m", "--minreads", type="int", dest="minreads",
@@ -120,6 +113,38 @@ if __name__=='__main__':
                              help="Quiet.", name="Quiet")
     parser.add_option_group(readcounts_og)
 
+    ''' Regex group '''
+    regexs_og = optparse_gui.OptionGroup(parser, "Filename Matching")
+    regexs_og.add_option("--normaldnare", type="str", dest="normaldnare",
+                         default='GDNA',
+                         help="Germline/Normal DNA filename regular expression. Default: GDNA.",
+                         remember=True, name="Germline DNA")
+    regexs_og.add_option("--normaltransre", type="str", dest="normaltransre",
+                         default='NRNA',
+                         help="Normal transcriptome filename regular expression. Default: NRNA.",
+                         remember=True, name="Normal Transcr.")
+    regexs_og.add_option("--tumordnare", type="str", dest="tumordnare",
+                         default='SDNA',
+                         help="Somatic/Tumor DNA filename regular expression. Default: SDNA.",
+                         remember=True, name="Somatic DNA")
+    regexs_og.add_option("--tumortransre", type="str", dest="tumortransre",
+                         default='TRNA',
+                         help="Tumor transcriptome filename regular expression. Default: TRNA.",
+                         remember=True, name="Tumor Transcr.")
+    parser.add_option_group(regexs_og)
+
+    ''' SNV annotation group'''
+    snvannot_og = optparse_gui.OptionGroup(parser, "SNV Annotation")
+    snvannot_og.add_option("-d", "--darned", type="file", dest="darned",
+                        default="",
+                        help="DARNED Annotations. Optional.", remember=True,
+                        filetypes=[("DARNED Annotations", "*.txt")])
+    snvannot_og.add_option("-c", "--cosmic", type="file", dest="cosmic",
+                        default="",
+                        help="COSMIC Annotations. Optional.", remember=True,
+                        filetypes=[("COSMIC Annotations", "*.tsv;*.tsv.gz")])
+    parser.add_option_group(snvannot_og)
+
     if gui:
         try:
             opt, args = parser.parse_args(opts=None)
@@ -128,7 +153,6 @@ if __name__=='__main__':
     else:
         opt, args = parser.parse_args()
 
-    print >>sys.stderr, opt
     ''' Setup output '''
     outtemp = './tmpd' # tempfile.mkdtemp()
 
@@ -172,71 +196,29 @@ if __name__=='__main__':
         debug=False,
     )
     readCounts.main(rc_opts)
+    # Copy readCounts.tsv
+    if os.path.isfile(rc_outfile):
+        shutil.copy(rc_outfile, opt.output)
 
     ''' Set up and apply snv_computation '''
+    sc_opts = OptValues(
+        counts=rc_outfile,
+        cosmic=opt.cosmic,
+        darned=opt.darned,
+        normaldnare=opt.normaldnare,
+        normaltransre=opt.normaltransre,
+        tumordnare=opt.tumordnare,
+        tumortransre=opt.tumortransre,
+        output=outtemp,
+    )
+    snv_computation.main(sc_opts)
 
-
-
-"""
-python rna2dnalign/main.py -h
-python rna2dnalign/main.py\
-  -s /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf\
-  -r /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.sorted.bam\
-  -o .
-
-python rna2dnalign/main.py\
-  -s /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf\
-  -r /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.sorted.bam\
-  -e /Volumes/CBI_GRAY/testR2D/UCSC_Human_hg19_RefSeq_CDS_exon_coordinates.txt\
-  -o .
-
-python rna2dnalign/readCounts.py\
-  -s /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf\
-  -r /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.sorted.bam\
-  -o ./tmpd/testfile.tsv
-
-python mgpcutils/exonicFilter.py\
-  --exons /Volumes/CBI_GRAY/testR2D/UCSC_Human_hg19_RefSeq_CDS_exon_coordinates.txt\
-  --input /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf\
-  --output tmp.vcf
-
-python rna2dnalign/main.py\
-  -s rna2dnalign/data/example-GDNA.vcf\
-  -r rna2dnalign/data/example-GDNA.bam\
-  -o .
-
-
-python rna2dnalign/main.py\
-  -s rna2dnalign/data/example-*.vcf\
-  -r rna2dnalign/data/example-*.bam\
-  -o .
-
-
-
-"""
-
-"""
-from pysam import VariantFile
-vcfin = '/Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf'
-exonin = '/Volumes/CBI_GRAY/testR2D/UCSC_Human_hg19_RefSeq_CDS_exon_coordinates.txt'
-out = 'tmp2.txt'
-
-vcf_fh = VariantFile(vcfin)
-vcf_outh = VariantFile(out, 'w', header=vcf_fh.header)
-
-for l in lines:
-    for rec in vcf_fh.fetch(l[0], int(l[1]), int(l[2])):
-        vcf_outh.write(rec)
-
-vcf_outh.close()
-
-bgzip -i /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf |\
-bcftools view -R /Volumes/CBI_GRAY/testR2D/UCSC_Human_hg19_RefSeq_CDS_exon_coordinates.txt
-
-bgzip /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf
-tabix /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf.gz
-bcftools view -R /Volumes/CBI_GRAY/testR2D/UCSC_Human_hg19_RefSeq_CDS_exon_coordinates.txt /Volumes/CBI_GRAY/testR2D/022NTex-TCGA-BH-A0E0-11A-13W-A10F-09_HOLD_QC_PENDING_IlluminaGA-DNASeq_exome.var.flt.vcf.gz
-
-
-
-"""
+    ''' Summarize events '''
+    outsum = os.path.join(opt.output, 'summary_result.txt')
+    if os.path.exists(outsum):
+        os.unlink(outsum)
+    for event in "RNAed T-RNAed VSE T-VSE VSL T-VSL LOH SOM SOM-E SOM-L".split():
+        evfile = os.path.join(outtemp, "Events_%s.tsv" % (event,))
+        if os.path.isfile(evfile):
+            shutil.copy(evfile, opt.output)
+            summary_analysis.read_events(evfile, outsum)

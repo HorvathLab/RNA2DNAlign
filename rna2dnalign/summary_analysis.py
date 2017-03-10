@@ -6,7 +6,7 @@ from collections import defaultdict, Counter
 from operator import itemgetter
 
 
-def read_events(file):
+def read_events(evfile, outfile):
     cosmic_dic = defaultdict(list)
     count = 0
     count_sam = 0
@@ -26,9 +26,9 @@ def read_events(file):
     count_T_G = 0
     count_T_C = 0
 
-    outdir = os.path.split(file)[0]
+    outdir = os.path.split(evfile)[0]
 
-    with open(file, 'Ur') as f:
+    with open(evfile, 'Ur') as f:
         reader = csv.reader((f), delimiter='\t')
         for row in reader:
             if row:
@@ -65,8 +65,8 @@ def read_events(file):
                         count_sam = count_sam + 1
                         l_sam.append(row[0])
 
-    with open(os.path.join(outdir, "summary_result.txt"), 'a') as out:
-        out.write("##Summary Result of" + " " + file)
+    with open(outfile, 'a') as out:
+        out.write("##Summary Result of" + " " + os.path.basename(evfile))
         out.write("\n")
         out.write("#Number of Sample Analyzed:" + " " + str(count_sam))
         out.write("\n")
