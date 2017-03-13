@@ -7,37 +7,29 @@ import sys
 import os
 import tempfile
 import shutil
+import atexit
 
 # third party imports
 
 # local application imports
 from version import VERSION
 from mgpcutils import optparse_gui
+import optgroups
+from optgroups import OptValues
 from mgpcutils import exonicFilter
 import readCounts
 import snv_computation
 import summary_analysis
+import allelic_maps
 
 __author__ = 'Matthew L. Bendall'
 
 ''' Check whether wx is available '''
 try:
     import wx
-    # print >>sys.stderr, "WX was imported"
     HAS_WX = True
 except ImportError:
-    # print >> sys.stderr, "WX was not imported"
     HAS_WX = False
-
-class OptValues:
-    """ Object with kwargs as attributes
-
-        Behaves like optparse.Values
-    """
-    def __init__(self, **kwargs):
-        self.__dict__ = kwargs
-    def __str__(self):
-        return str(self.__dict__)
 
 if __name__=='__main__':
     if len(sys.argv) == 1 and HAS_WX:
@@ -70,73 +62,20 @@ if __name__=='__main__':
                       name="Output Folder")
 
     ''' Exon filtering group '''
-    exfilt_og = optparse_gui.OptionGroup(parser, "Filtering")
-    exfilt_og.add_option("-e", "--exoncoords", type="file", dest="exoncoords",
-                         default=None,
-                         help="Exon coordinates for SNV filtering. Optional.",
-                         name="Exon Coords.",
-                         remember=True,
-                         filetypes=[("Exonic Coordinates", "*.txt")])
-    parser.add_option_group(exfilt_og)
-
+    parser.add_option_group(optgroups.get_exonfilt_optgroup(parser))
     ''' Readcounts group '''
-    readcounts_og = optparse_gui.OptionGroup(parser, "Read Counting")
-    readcounts_og.add_option("-m", "--minreads", type="int", dest="minreads",
-                             default=10, remember=True,
-                             help="Minimum number of good reads at SNV locus per alignment file. Default=10.",
-                             name="Min. Reads")
-    readcounts_og.add_option("-M", "--maxreads", type="float", dest="maxreads",
-                             default=None, remember=True,
-                             help="Scale read counts at high-coverage loci to ensure at most this many good reads at SNV locus per alignment file. Values greater than 1 indicate absolute read counts, otherwise the value indicates the coverage distribution percentile. Default=No maximum.",
-                             name="Max. Reads")
-    readcounts_og.add_option("-f", "--alignmentfilter", action="store_false",
-                             dest="filter", default=True, remember=True,
-                             help="(Turn off) alignment filtering by length, edits, etc.",
-                             name="Filter Alignments")
-    readcounts_og.add_option("-U", "--uniquereads", action="store_true",
-                             dest="unique", default=False, remember=True,
-                             help="Consider only distinct reads.",
-                             name="Unique Reads")
-    readcounts_og.add_option("-t", "--threadsperbam", type="int", dest="tpb",
-                             default=1, remember=True,
-                             help="Worker threads per alignment file. Indicate no threading with 0. Default=1.",
-                             name="Threads/BAM")
-    readcounts_og.add_option("-q", "--quiet", action="store_true", dest="quiet",
-                             default=False, remember=True,
-                             help="Quiet.", name="Quiet")
-    parser.add_option_group(readcounts_og)
-
+    parser.add_option_group(optgroups.get_readcounts_optgroup(parser))
     ''' Regex group '''
-    regexs_og = optparse_gui.OptionGroup(parser, "Filename Matching")
-    regexs_og.add_option("--normaldnare", type="str", dest="normaldnare",
-                         default='GDNA',
-                         help="Germline/Normal DNA filename regular expression. Default: GDNA.",
-                         remember=True, name="Germline DNA")
-    regexs_og.add_option("--normaltransre", type="str", dest="normaltransre",
-                         default='NRNA',
-                         help="Normal transcriptome filename regular expression. Default: NRNA.",
-                         remember=True, name="Normal Transcr.")
-    regexs_og.add_option("--tumordnare", type="str", dest="tumordnare",
-                         default='SDNA',
-                         help="Somatic/Tumor DNA filename regular expression. Default: SDNA.",
-                         remember=True, name="Somatic DNA")
-    regexs_og.add_option("--tumortransre", type="str", dest="tumortransre",
-                         default='TRNA',
-                         help="Tumor transcriptome filename regular expression. Default: TRNA.",
-                         remember=True, name="Tumor Transcr.")
-    parser.add_option_group(regexs_og)
-
+    parser.add_option_group(optgroups.get_regex_optgroup(parser))
     ''' SNV annotation group'''
-    snvannot_og = optparse_gui.OptionGroup(parser, "SNV Annotation")
-    snvannot_og.add_option("-d", "--darned", type="file", dest="darned",
-                        default="",
-                        help="DARNED Annotations. Optional.", remember=True,
-                        filetypes=[("DARNED Annotations", "*.txt")])
-    snvannot_og.add_option("-c", "--cosmic", type="file", dest="cosmic",
-                        default="",
-                        help="COSMIC Annotations. Optional.", remember=True,
-                        filetypes=[("COSMIC Annotations", "*.tsv;*.tsv.gz")])
-    parser.add_option_group(snvannot_og)
+    parser.add_option_group(optgroups.get_snvannot_optgroup(parser))
+    ''' Allelic maps group '''
+    parser.add_option("--make_maps", action="store_true",
+                      dest="make_maps", default=False, remember=True,
+                      help='''Create allelic maps?
+                              Default: Do not create allelic maps.''',
+                     )
+    parser.add_option_group(optgroups.get_allelicmaps_optgroup(parser))
 
     if gui:
         try:
@@ -147,7 +86,8 @@ if __name__=='__main__':
         opt, args = parser.parse_args()
 
     ''' Setup output '''
-    outtemp = './tmpd' # tempfile.mkdtemp()
+    outtemp = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, path=outtemp)
 
     ''' Apply exonic filter on SNVs '''
     if opt.exoncoords:
@@ -215,3 +155,25 @@ if __name__=='__main__':
         if os.path.isfile(evfile):
             shutil.copy(evfile, opt.output)
             summary_analysis.read_events(evfile, outsum)
+
+    ''' Allelic maps '''
+    if opt.make_maps:
+        am_opts = OptValues(
+            counts=rc_outfile,
+            normaldnare=opt.normaldnare,
+            normaltransre=opt.normaltransre,
+            tumordnare=opt.tumordnare,
+            tumortransre=opt.tumortransre,
+            save_conf=opt.save_conf,
+            circos_path=opt.circos_path,
+            sample_name=opt.sample_name,
+            output=opt.output,
+        )
+        allelic_maps.main(am_opts)
+
+"""
+python rna2dnalign/main.py\
+  -s "rna2dnalign/data/example-*.vcf"\
+  -r "rna2dnalign/data/example-*.bam"\
+  -o ../testing4
+"""
