@@ -17,24 +17,24 @@ def get_regex_optgroup(parser):
     ''' Regex group '''
     optgrp = optparse_gui.OptionGroup(parser, "Filename Matching")
     optgrp.add_option("--normaldnare", type="str", dest="normaldnare",
-                      default=r'GDNA',
+                      default=r'NTex',
                       help='''Germline/Normal DNA filename regular expression.
-                              Default: GDNA.''',
+                              Default: NTex.''',
                       remember=True, name="Germline DNA RE")
     optgrp.add_option("--normaltransre", type="str", dest="normaltransre",
-                      default=r'NRNA',
+                      default=r'NTtr',
                       help='''Normal transcriptome filename regular expression.
-                              Default: NRNA.''',
+                              Default: NTtr.''',
                       remember=True, name="Normal Transcr. RE")
     optgrp.add_option("--tumordnare", type="str", dest="tumordnare",
-                      default=r'SDNA',
+                      default=r'TPex',
                       help='''Somatic/Tumor DNA filename regular expression.
-                              Default: SDNA.''',
+                              Default: TPex.''',
                       remember=True, name="Somatic DNA RE")
     optgrp.add_option("--tumortransre", type="str", dest="tumortransre",
-                      default=r'TRNA',
+                      default=r'TPtr',
                       help='''Tumor transcriptome filename regular expression.
-                      Default: TRNA.''',
+                              Default: TPtr.''',
                       remember=True, name="Tumor Transcr. RE")
     return optgrp
 

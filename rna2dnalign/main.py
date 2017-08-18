@@ -171,9 +171,3 @@ if __name__=='__main__':
         )
         allelic_maps.main(am_opts)
 
-"""
-python rna2dnalign/main.py\
-  -s "rna2dnalign/data/example-*.vcf"\
-  -r "rna2dnalign/data/example-*.bam"\
-  -o ../testing4
-"""
