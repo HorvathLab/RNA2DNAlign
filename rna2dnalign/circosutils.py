@@ -11,7 +11,7 @@ CIRCOS_CONF = '''
 <<include etc/image.conf>>
 </image>
 
-karyotype   = data/karyotype/karyotype.human.txt
+karyotype   = data/karyotype/%(build_file)s
 
 chromosomes_units = 100000
 chromosomes       = -hsY
@@ -260,11 +260,18 @@ band_stroke_color     = black
 band_transparency     = 0.05
 '''
 
-CONFDICT = {
-    'circos.conf': CIRCOS_CONF,
-    'ticks.conf': TICKS_CONF,
-    'ideogram.conf': IDEOGRAM_CONF,
-    'ideogram.label.conf': IDEOGRAM_LABEL_CONF,
-    'ideogram.position.conf': IDEOGRAM_POSITION_CONF,
-    'bands.conf': BANDS_CONF,
-}
+def get_configurations(genome_build=None):
+    if genome_build not in ['hg16', 'hg17', 'hg18', 'hg19', 'hg38']:
+        build_file = 'karyotype.human.txt'
+    else:
+        build_file = 'karyotype.human.%s.txt' % genome_build
+
+    d = {
+        'circos.conf': CIRCOS_CONF % {'build_file': build_file},
+        'ticks.conf': TICKS_CONF,
+        'ideogram.conf': IDEOGRAM_CONF,
+        'ideogram.label.conf': IDEOGRAM_LABEL_CONF,
+        'ideogram.position.conf': IDEOGRAM_POSITION_CONF,
+        'bands.conf': BANDS_CONF,
+    }
+    return d

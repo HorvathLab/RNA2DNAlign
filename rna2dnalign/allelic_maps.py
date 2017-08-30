@@ -13,7 +13,7 @@ import tempfile
 import shutil
 import atexit
 
-from circosutils import CONFDICT
+import circosutils
 from mgpcutils import optparse_gui
 import optgroups
 
@@ -109,7 +109,8 @@ def main(opt):
     make_tracks(opt.counts, outtemp, opt.sample_name, dt_regex)
 
     ''' Create circos configuration files '''
-    for fn, confstr in CONFDICT.iteritems():
+    config_files = circosutils.get_configurations()
+    for fn, confstr in config_files.iteritems():
         with open(os.path.join(outtemp, fn), 'w') as outh:
             print >>outh, confstr
 
