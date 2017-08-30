@@ -18,4 +18,9 @@ setup(
         'mgpcutils',
     ],
     zip_safe=False,
+    entry_points = {
+        'console_scripts': [
+            'rna2dnalign = rna2dnalign.main:run',
+        ],
+    }
 )

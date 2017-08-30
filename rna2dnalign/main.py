@@ -31,7 +31,7 @@ try:
 except ImportError:
     HAS_WX = False
 
-if __name__=='__main__':
+def run():
     if len(sys.argv) == 1 and HAS_WX:
         # Using the GUI
         parser = optparse_gui.OptionParserGUI(version=VERSION)
@@ -171,3 +171,5 @@ if __name__=='__main__':
         )
         allelic_maps.main(am_opts)
 
+if __name__=='__main__':
+    run()
